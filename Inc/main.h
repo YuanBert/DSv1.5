@@ -81,6 +81,8 @@
 #define CoreBoard_TX_GPIO_Port GPIOA
 #define CoreBoard_RX_Pin GPIO_PIN_10
 #define CoreBoard_RX_GPIO_Port GPIOA
+#define MCU_LED_PWM_Pin GPIO_PIN_4
+#define MCU_LED_PWM_GPIO_Port GPIOB
 #define MCU_FAN_OUT_Pin GPIO_PIN_5
 #define MCU_FAN_OUT_GPIO_Port GPIOB
 #define MCU_LED_OUT_Pin GPIO_PIN_6
