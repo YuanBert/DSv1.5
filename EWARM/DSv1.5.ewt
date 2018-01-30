@@ -1202,6 +1202,12 @@
                 <name>$PROJ_DIR$\..\Src\dma.c</name>
             </file>
             <file>
+                <name>$PROJ_DIR$\..\Src\DS_DataTransmissionLayer.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\Src\ds_FillLight.c</name>
+            </file>
+            <file>
                 <name>$PROJ_DIR$\..\Src\gpio.c</name>
             </file>
             <file>

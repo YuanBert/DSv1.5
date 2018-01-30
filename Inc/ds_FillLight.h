@@ -1,10 +1,16 @@
 /**
   ******************************************************************************
-  * @file    stm32f1xx_it.h
-  * @brief   This file contains the headers of the interrupt handlers.
-  ******************************************************************************
+  * File Name          : ds_FillLight.h
+  * Description        : 
   *
-  * COPYRIGHT(c) 2018 STMicroelectronics
+  ******************************************************************************
+  ** This notice applies to any and all portions of this file
+  * that are not between comment pairs USER CODE BEGIN and
+  * USER CODE END. Other portions of this file, whether 
+  * inserted by the user or by software development tools
+  * are owned by their respective copyright owners.
+  *
+  * COPYRIGHT(c) 2017 STMicroelectronics
   *
   * Redistribution and use in source and binary forms, with or without modification,
   * are permitted provided that the following conditions are met:
@@ -30,49 +36,33 @@
   *
   ******************************************************************************
   */
-
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __STM32F1xx_IT_H
-#define __STM32F1xx_IT_H
-
+#ifndef __DS_FILLLIGHT_H
+#define __DS_FILLLIGHT_H
 #ifdef __cplusplus
+
+
+
  extern "C" {
-#endif 
-
+#endif
 /* Includes ------------------------------------------------------------------*/
-#include "stm32f1xx_hal.h"
+#include "tim.h"
 #include "main.h"
-/* Exported types ------------------------------------------------------------*/
-/* Exported constants --------------------------------------------------------*/
-/* Exported macro ------------------------------------------------------------*/
-/* Exported functions ------------------------------------------------------- */
-
-void NMI_Handler(void);
-void HardFault_Handler(void);
-void MemManage_Handler(void);
-void BusFault_Handler(void);
-void UsageFault_Handler(void);
-void SVC_Handler(void);
-void DebugMon_Handler(void);
-void PendSV_Handler(void);
-void SysTick_Handler(void);
-void DMA1_Channel1_IRQHandler(void);
-void DMA1_Channel3_IRQHandler(void);
-void DMA1_Channel5_IRQHandler(void);
-void DMA1_Channel6_IRQHandler(void);
-void ADC1_2_IRQHandler(void);
-void TIM3_IRQHandler(void);
-void TIM4_IRQHandler(void);
-void SPI1_IRQHandler(void);
-void USART1_IRQHandler(void);
-void USART2_IRQHandler(void);
-void USART3_IRQHandler(void);
-void TIM5_IRQHandler(void);
-
+#include "stm32f1xx_hal.h"
+   
+#define MCU_LED_OFF                     GPIO_PIN_SET
+#define MCU_LED_ON                      GPIO_PIN_RESET
+   
+/* USER CODE BEGIN Includes */
+/* USER CODE END Includes */
+/* USER CODE BEGIN Private defines */
+void DS_LED_OUT_OFF(void);
+void DS_LED_OUT_ON(void);
+void DS_SetLedPwmValue(uint16_t value);
+/* USER CODE END Private defines */
+/* USER CODE BEGIN Prototypes */
+/* USER CODE END Prototypes */
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __STM32F1xx_IT_H */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
+#endif /*__DS_FILLLIGHT_H */

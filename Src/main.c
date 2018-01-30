@@ -47,7 +47,7 @@
 #include "gpio.h"
 
 /* USER CODE BEGIN Includes */
-
+#include "ds_FillLight.h"
 /* USER CODE END Includes */
 
 /* Private variables ---------------------------------------------------------*/
@@ -63,7 +63,6 @@ static void MX_NVIC_Init(void);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
-void LED_PWM_SetValue(uint16_t value);
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
@@ -110,6 +109,8 @@ int main(void)
 
   /* USER CODE BEGIN 2 */
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+  HAL_TIM_Base_Start_IT(&htim4);
+  HAL_TIM_Base_Start_IT(&htim5);
 
   /* USER CODE END 2 */
 
@@ -219,15 +220,25 @@ static void MX_NVIC_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void LED_PWM_SetValue(uint16_t value)
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-  TIM_OC_InitTypeDef sConfigOC;
-   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-   sConfigOC.Pulse = value;
-   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-   HAL_TIM_PWM_ConfigChannel(&htim3,&sConfigOC,TIM_CHANNEL_1);
-   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+  /* Prevent unused argument(s) compilation warning */
+  UNUSED(htim);
+  /* NOTE : This function Should not be modified, when the callback is needed,
+            the __HAL_TIM_PeriodElapsedCallback could be implemented in the user file
+   */
+  /* 0.1 ms*/
+if(htim4.Instance == htim->Instance)
+{
+  
+}
+
+/* 1ms */
+if(htim5.Instance == htim->Instance)
+{
+  
+}
+
 }
 /* USER CODE END 4 */
 
