@@ -46,7 +46,7 @@
 ******************************************************************************
 */
 /* Includes ------------------------------------------------------------------*/
-#include "DS_DataTransmissionLayer.h"
+#include "ds_DataTransmissionLayer.h"
 #include "usart.h"
 #include "gpio.h"
 

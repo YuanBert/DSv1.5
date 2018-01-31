@@ -1,7 +1,7 @@
 /**
 ******************************************************************************
-* File Name          : DS_DataTransmissionLayer.h
-* Description        : DS_DataTransmissionLayer
+* File Name          : ds_ProcotolLayer.h
+* Description        : 
 *
 ******************************************************************************
 ** This notice applies to any and all portions of this file
@@ -37,50 +37,80 @@
 ******************************************************************************
 */
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __DS_DTL_H
-#define __DS_DTL_H
+#ifndef __DS_PROCOTOLLAYER_H
+#define __DS_PROCOTOLLAYER_H
 #ifdef __cplusplus
 extern "C" {
 #endif
+  
+  
+#define REQUESTFIXEDCOMMANDLEN        7         //Header + CmdType + CmdParam + DataLength + XOR8Bits + End
+#define ACKFIXEDCOMMANDLEN            6         //Header + AckCmdCode + AckCodeH + XOR8Bits  + End
+ 
+#define DATABUFLEN      512
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "stm32f1xx_hal.h"
 #include "Common.h"
-#define DS_RX_LEN                     512      //Accept the buffer size
+#include "ds_DataTransmissionLayer.h"
   
-  /*******************************************************************************
-  ** struct: sUsartReciveType
-  **
-  ** DESCRIPTION:
-  **  --
-  **
-  ** CREATED: 2017/12/7, by Bert
-  **
-  ** FILE: DS_Protocol.h
-  **
-  ** AUTHOR: Bert.Zhang
-  ********************************************************************************
-  */
-  struct sUsartReciveType
-  {
-    uint8_t     RX_Flag:1;
-    uint16_t    RX_Size;
-    uint8_t     RX_pData[DS_RX_LEN];
-  }; 
- 
-typedef struct sUsartReciveType   USARTRECIVETYPE,    *pUSARTRECIVETYPE;
-
-DS_StatusTypeDef DS_CoreBoardProtocolInit(void);
-DS_StatusTypeDef DS_LeftDoorBoardProtocolInit(void);
-DS_StatusTypeDef DS_RightDoorBoardProtocolInit(void);
-
-
-DS_StatusTypeDef DS_SendDataToCoreBoard(uint8_t* pData, uint16_t size, uint32_t Timeout);
-DS_StatusTypeDef DS_SendDataToLeftDoorBoard(uint8_t* pData, uint16_t size, uint32_t Timeout);
-DS_StatusTypeDef DS_SendDataToRightDoorBoard(uint8_t* pData, uint16_t size, uint32_t Timeout);
-
-
+  struct t_RevDataStruct{
+    
+    uint8_t     CmdType;
+    uint8_t     CmdParam;
+    uint8_t     XOR8BIT;
+    uint16_t    DataLength;
+    uint16_t    TotalLength;
+    uint8_t     NumberOfBytesReceived;
+    uint8_t     RevOKFlag;
+    uint8_t     *pRevDataBuf;  
+  };
   
+  struct t_NeedToAckStruct{
+    
+    uint8_t     CmdType[5];
+    uint8_t     CmdParam[5];
+    uint8_t     HandingOK[5];
+    uint8_t     NeedAckFlag[5];
+    uint8_t     DeviceType[5];// 0-None or Error 1-CoreBoard   2-LeftDoorBoard 3-RightDoorBoard
+    uint8_t     NeedToAckCnt;
+  };
+  
+  struct t_SendDataStruct{
+    uint8_t     CmdType;
+    uint8_t     CmdParam;
+    uint8_t     SendOKFlag;
+    uint8_t     RevAckedOK;
+    uint8_t     *pSendDataBuf; 
+  };
+  
+  struct t_RevACkStruct{
+    uint8_t     AckCmdCode[5];
+    uint8_t     AckCodeH[5];
+    uint8_t     AckCodeL[5];
+    uint8_t     CheckedAckFlag[5];
+    uint8_t     AckCnt;
+  };
+  
+//  struct t_SentOrdersStruct{
+//    uint8_t     CmdType[5];
+//    uint8_t     CmdParam[5];
+//    uint8_t     
+//  
+//  };
+  
+  typedef struct t_RevACkStruct     AckedStruct,         *pAckedStruct;
+  typedef struct t_RevDataStruct    RevDataStruct,       *pRevDataStruct;
+  typedef struct t_SendDataStruct   SendDataStrct,       *pSendDataStruct;
+  
+  
+
+DS_StatusTypeDef DS_HandingUartDataFromCoreBoard(void);
+DS_StatusTypeDef DS_HandingUartDataFromLeftDoorBoard(void); 
+DS_StatusTypeDef DS_HandingUartDataFromRightDoorBoard(void);
+
+
+
 /* USER CODE BEGIN Includes */
 /* USER CODE END Includes */
 /* USER CODE BEGIN Private defines */
@@ -90,4 +120,4 @@ DS_StatusTypeDef DS_SendDataToRightDoorBoard(uint8_t* pData, uint16_t size, uint
 #ifdef __cplusplus
 }
 #endif
-#endif /*__DS_DTL_H */
+#endif /*__DS_PROCOTOLLAYER_H */
