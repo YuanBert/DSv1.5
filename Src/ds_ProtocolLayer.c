@@ -88,156 +88,160 @@ static uint8_t getXORCode(uint8_t* pData,uint16_t len)
   return ret;
 }
 
-static DS_StatusTypeDef DS_HandingUartData(pRevDataStruct pRevDataStruct,pUSARTRECIVETYPE pUsartType ,uint8_t* pRevDataBuf)
+static DS_StatusTypeDef DS_HandingUartData(pRevDataStruct pRevData,pAckedStruct pAckedData,pUSARTRECIVETYPE pUsartType ,uint8_t* pRevDataBuf)
 {
   DS_StatusTypeDef state = DS_OK;
   uint8_t xorTemp;
   uint16_t i;
-  if(!CoreBoardUsartType.RX_Flag)
+  
+  /* 判断串口数据是否接收完成 */
+  if(!(pUsartType->RX_Flag))
   {
     return state;
   }
-  CoreBoardUsartType.RX_Flag = 0;
+  
+  pUsartType->RX_Flag = 0;
   
   /*  Handling the ACK Cmd */
-  if(0xA0 == *(CoreBoardUsartType.RX_pData + 1)&0xF0)
+  if(0xA0 == *(pUsartType->RX_pData + 1)&0xF0)
   {
-      if(CoreBoardAckedData.AckCnt > 5)
+      if(pAckedData->AckCnt > 5)
       {
         return state;
       }
-      if(0x5B != *(CoreBoardUsartType.RX_pData) || 0x5D != *(CoreBoardUsartType.RX_pData + ACKFIXEDCOMMANDLEN -1))
+      if(0x5B != *(pUsartType->RX_pData) || 0x5D != *(pUsartType->RX_pData + ACKFIXEDCOMMANDLEN -1))
       {
           return state;
       }
-      xorTemp = getXORCode(CoreBoardUsartType.RX_pData + 1,3);
-      if(xorTemp != *(CoreBoardUsartType.RX_pData + 4))
+      xorTemp = getXORCode(pUsartType->RX_pData + 1,3);
+      if(xorTemp != *(pUsartType->RX_pData + 4))
       {
         return state;
       }
       
-      CoreBoardAckedData.AckCmdCode[CoreBoardAckedData.AckCnt]     = *(CoreBoardUsartType.RX_pData + 1);
-      CoreBoardAckedData.AckCodeH[CoreBoardAckedData.AckCnt]       = *(CoreBoardUsartType.RX_pData + 2);
-      CoreBoardAckedData.AckCodeL[CoreBoardAckedData.AckCnt]       = *(CoreBoardUsartType.RX_pData + 3);
-      CoreBoardAckedData.CheckedAckFlag[CoreBoardAckedData.AckCnt] = 1;
+      pAckedData->AckCmdCode[pAckedData->AckCnt]     = *(pUsartType->RX_pData + 1);
+      pAckedData->AckCodeH[pAckedData->AckCnt]       = *(pUsartType->RX_pData + 2);
+      pAckedData->AckCodeL[pAckedData->AckCnt]       = *(pUsartType->RX_pData + 3);
+      pAckedData->CheckedAckFlag[pAckedData->AckCnt] = 1;
       
-      CoreBoardAckedData.AckCnt++;
+      pAckedData->AckCnt++;
       
       return state;
   }
   /* 在ACK命令处理时需要对ACkCnt进行间操作，每进行一次操作进行一次减操作 */
   
+  
   /* Handling Request Cmd Data */
-  if(CoreBoardRevDataStruct.RevOKFlag)
+  if(pRevData->RevOKFlag)
   {
     return state;
   }
   
-  if(CoreBoardRevDataStruct.NumberOfBytesReceived < CoreBoardRevDataStruct.DataLength && 0 != CoreBoardRevDataStruct.NumberOfBytesReceived)
+  if((pRevData->NumberOfBytesReceived) < (pRevData->DataLength) && 0 != (pRevData->NumberOfBytesReceived))
   {
-    for(i = 0; i < CoreBoardUsartType.RX_Size; i++)
+    for(i = 0; i < pUsartType->RX_Size; i++)
     {
-      CoreRevDataBuf[5 + CoreBoardRevDataStruct.NumberOfBytesReceived] = *(CoreBoardUsartType.RX_pData + i);
-      CoreBoardRevDataStruct.NumberOfBytesReceived ++;
-      if(CoreBoardRevDataStruct.DataLength == CoreBoardRevDataStruct.NumberOfBytesReceived)
+      pRevDataBuf[5 + pRevData->NumberOfBytesReceived] = *(pUsartType->RX_pData + i);
+      pRevData->NumberOfBytesReceived ++;
+      if(pRevData->DataLength == pRevData->NumberOfBytesReceived)
       {
-        CoreBoardRevDataStruct.XOR8BIT = *(CoreBoardUsartType.RX_pData + i + 1);
-        if(0x5D != *(CoreBoardUsartType.RX_pData + i + 2))
+        pRevData->XOR8BIT = *(pUsartType->RX_pData + i + 1);
+        if(0x5D != *(pUsartType->RX_pData + i + 2))
         {
-          CoreBoardRevDataStruct.NumberOfBytesReceived = 0;
-          CoreBoardRevDataStruct.DataLength = 0;
-          CoreBoardRevDataStruct.TotalLength = 0;
+          pRevData->NumberOfBytesReceived = 0;
+          pRevData->DataLength = 0;
+          pRevData->TotalLength = 0;
           return state;
         }
-        CoreBoardRevDataStruct.TotalLength = CoreBoardRevDataStruct.DataLength + REQUESTFIXEDCOMMANDLEN;
+        pRevData->TotalLength = pRevData->DataLength + REQUESTFIXEDCOMMANDLEN;
         /* here to check XOR code */
-        xorTemp = getXORCode(CoreRevDataBuf + 1, CoreBoardRevDataStruct.TotalLength - 3);
-        if(CoreBoardRevDataStruct.XOR8BIT != xorTemp)
+        xorTemp = getXORCode(pRevDataBuf + 1, pRevData->TotalLength - 3);
+        if(pRevData->XOR8BIT != xorTemp)
         {
-          CoreBoardRevDataStruct.NumberOfBytesReceived = 0;
-          CoreBoardRevDataStruct.DataLength = 0;
-          CoreBoardRevDataStruct.TotalLength = 0;      
+          pRevData->NumberOfBytesReceived = 0;
+          pRevData->DataLength = 0;
+          pRevData->TotalLength = 0;      
           return state;
         }
-        CoreRevDataBuf[5 + CoreBoardRevDataStruct.NumberOfBytesReceived] = xorTemp;
-        CoreRevDataBuf[5 + CoreBoardRevDataStruct.NumberOfBytesReceived + 1] = 0x5D;
-        CoreBoardRevDataStruct.pRevDataBuf = CoreRevDataBuf;
-        CoreBoardRevDataStruct.RevOKFlag = 1;
+        pRevDataBuf[5 + pRevData->NumberOfBytesReceived] = xorTemp;
+        pRevDataBuf[5 + pRevData->NumberOfBytesReceived + 1] = 0x5D;
+        pRevData->pRevDataBuf = pRevDataBuf;
+        pRevData->RevOKFlag = 1;
       }
     }
     return state;
   }
   
-  if(CoreBoardRevDataStruct.TotalLength)
+  if(0 == pRevData->TotalLength)
   {
-    if(0x5B != *(CoreBoardUsartType.RX_pData))
+    if(0x5B != *(pUsartType->RX_pData))
     {
       return state;
     }
-    CoreBoardRevDataStruct.CmdType      =*(CoreBoardUsartType.RX_pData + 1);
-    CoreBoardRevDataStruct.CmdParam     =*(CoreBoardUsartType.RX_pData + 2);
+    pRevData->CmdType      =*(pUsartType->RX_pData + 1);
+    pRevData->CmdParam     =*(pUsartType->RX_pData + 2);
     
-    CoreBoardRevDataStruct.DataLength   =(*(CoreBoardUsartType.RX_pData + 3)) << 8 + *(CoreBoardUsartType.RX_pData + 4);
+    pRevData->DataLength   =(*(pUsartType->RX_pData + 3)) << 8 + *(pUsartType->RX_pData + 4);
     
-    if(0 == CoreBoardRevDataStruct.DataLength)
+    if(0 == pRevData->DataLength)
     {
-      if(0x5D != *(CoreBoardUsartType.RX_pData + REQUESTFIXEDCOMMANDLEN - 1))
+      if(0x5D != *(pUsartType->RX_pData + REQUESTFIXEDCOMMANDLEN - 1))
       {
         return state;
       }
-      CoreBoardRevDataStruct.XOR8BIT         =*(CoreBoardUsartType.RX_pData + 5);
-      CoreBoardRevDataStruct.TotalLength     = REQUESTFIXEDCOMMANDLEN;
-      xorTemp = getXORCode(CoreBoardUsartType.RX_pData + 1, REQUESTFIXEDCOMMANDLEN - 3);
-      if(CoreBoardRevDataStruct.XOR8BIT != xorTemp)
+      pRevData->XOR8BIT         =*(pUsartType->RX_pData + 5);
+      pRevData->TotalLength     = REQUESTFIXEDCOMMANDLEN;
+      xorTemp = getXORCode(pUsartType->RX_pData + 1, REQUESTFIXEDCOMMANDLEN - 3);
+      if(pRevData->XOR8BIT != xorTemp)
       {
-        CoreBoardRevDataStruct.TotalLength = 0;
+        pRevData->TotalLength = 0;
         return state;
       }
-      CoreRevDataBuf[0]           = 0x5B;
-      CoreRevDataBuf[1]           = CoreBoardRevDataStruct.CmdType;
-      CoreRevDataBuf[2]           = CoreBoardRevDataStruct.CmdParam;
-      CoreRevDataBuf[3]           = *(CoreBoardUsartType.RX_pData + 3);
-      CoreRevDataBuf[4]           = *(CoreBoardUsartType.RX_pData + 4);
-      CoreRevDataBuf[5]           = CoreBoardRevDataStruct.XOR8BIT;
-      CoreRevDataBuf[6]           = 0x5D;
+      pRevDataBuf[0]           = 0x5B;
+      pRevDataBuf[1]           = pRevData->CmdType;
+      pRevDataBuf[2]           = pRevData->CmdParam;
+      pRevDataBuf[3]           = *(pUsartType->RX_pData + 3);
+      pRevDataBuf[4]           = *(pUsartType->RX_pData + 4);
+      pRevDataBuf[5]           = pRevData->XOR8BIT;
+      pRevDataBuf[6]           = 0x5D;
       
-      CoreBoardRevDataStruct.RevOKFlag = 1;
+      pRevData->RevOKFlag = 1;
       
       return state;
     }
     
-    for(i = 5; i < CoreBoardUsartType.RX_Size; i++)
+    for(i = 5; i < pUsartType->RX_Size; i++)
     {
-      CoreRevDataBuf[i] = *(CoreBoardUsartType.RX_pData + i);
-      CoreBoardRevDataStruct.NumberOfBytesReceived ++;
-      if(CoreBoardRevDataStruct.DataLength == CoreBoardRevDataStruct.NumberOfBytesReceived)
+      pRevDataBuf[i] = *(pUsartType->RX_pData + i);
+      pRevData->NumberOfBytesReceived ++;
+      if(pRevData->DataLength == pRevData->NumberOfBytesReceived)
       {
-        if(0x5D != *(CoreBoardUsartType.RX_pData + REQUESTFIXEDCOMMANDLEN + CoreBoardRevDataStruct.NumberOfBytesReceived - 1))
+        if(0x5D != *(pUsartType->RX_pData + REQUESTFIXEDCOMMANDLEN + pRevData->NumberOfBytesReceived - 1))
         {
-          CoreBoardRevDataStruct.DataLength = 0;
-          CoreBoardRevDataStruct.NumberOfBytesReceived = 0;
-          CoreBoardRevDataStruct.TotalLength = 0;
+          pRevData->DataLength = 0;
+          pRevData->NumberOfBytesReceived = 0;
+          pRevData->TotalLength = 0;
         }
         
-        CoreBoardRevDataStruct.XOR8BIT = *(CoreBoardUsartType.RX_pData + i + 1 );
-        CoreBoardRevDataStruct.TotalLength = CoreBoardRevDataStruct.DataLength + REQUESTFIXEDCOMMANDLEN;
+        pRevData->XOR8BIT = *(pUsartType->RX_pData + i + 1 );
+        pRevData->TotalLength = pRevData->DataLength + REQUESTFIXEDCOMMANDLEN;
         /* here to XOR check */
-        xorTemp = getXORCode(CoreBoardUsartType.RX_pData + 1, CoreBoardRevDataStruct.TotalLength - 3);
-        if(CoreBoardRevDataStruct.XOR8BIT != xorTemp)
+        xorTemp = getXORCode(pUsartType->RX_pData + 1, pRevData->TotalLength - 3);
+        if(pRevData->XOR8BIT != xorTemp)
         {
-          CoreBoardRevDataStruct.TotalLength = 0;
+          pRevData->TotalLength = 0;
           return state;
         }
         
-        CoreRevDataBuf[0]           = 0x5B;
-        CoreRevDataBuf[1]           = CoreBoardRevDataStruct.CmdType;
-        CoreRevDataBuf[2]           = CoreBoardRevDataStruct.CmdParam;
-        CoreRevDataBuf[3]           = *(CoreBoardUsartType.RX_pData + 3);
-        CoreRevDataBuf[4]           = *(CoreBoardUsartType.RX_pData + 4);
+        pRevDataBuf[0]           = 0x5B;
+        pRevDataBuf[1]           = pRevData->CmdType;
+        pRevDataBuf[2]           = pRevData->CmdParam;
+        pRevDataBuf[3]           = *(pUsartType->RX_pData + 3);
+        pRevDataBuf[4]           = *(pUsartType->RX_pData + 4);
         
-        CoreRevDataBuf[i + 1]           = CoreBoardRevDataStruct.XOR8BIT;
-        CoreRevDataBuf[i + 2]           = 0x5D;
-        CoreBoardRevDataStruct.RevOKFlag = 1;
+        pRevDataBuf[i + 1]           = pRevData->XOR8BIT;
+        pRevDataBuf[i + 2]           = 0x5D;
+        pRevData->RevOKFlag = 1;
         return state;
       }
     }
@@ -245,6 +249,7 @@ static DS_StatusTypeDef DS_HandingUartData(pRevDataStruct pRevDataStruct,pUSARTR
   }
   return state;  
 }
+
 
 /*******************************************************************************
 *
