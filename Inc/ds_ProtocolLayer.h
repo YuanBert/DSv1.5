@@ -54,6 +54,12 @@ extern "C" {
 #include "Common.h"
 #include "ds_DataTransmissionLayer.h"
   
+
+  struct t_HandingFlag{
+    uint8_t     Flag;
+    uint8_t     position;
+    uint8_t     ptrDataBuf;
+  };
   struct t_RevDataStruct{
     
     uint8_t     CmdType;
@@ -67,13 +73,13 @@ extern "C" {
   };
   
   struct t_NeedToAckStruct{
-    
-    uint8_t     CmdType[5];
-    uint8_t     CmdParam[5];
-    uint8_t     HandingOK[5];
-    uint8_t     NeedAckFlag[5];
-    uint8_t     DeviceType[5];// 0-None or Error 1-CoreBoard   2-LeftDoorBoard 3-RightDoorBoard
-    uint8_t     NeedToAckCnt;
+    uint8_t     AckCmdCode[16];
+    uint8_t     AckCodeH[16];
+    uint8_t     AckCodeL[16];    
+    uint8_t     CmdType[16];
+    uint8_t     CmdParam[16];
+    uint8_t     DeviceType[16];// 0-None or Error 1-CoreBoard   2-LeftDoorBoard 3-RightDoorBoard
+    uint8_t     TableID[16];
   };
   
   struct t_SendDataStruct{
@@ -98,18 +104,24 @@ extern "C" {
 //    uint8_t     
 //  
 //  };
-  
+  typedef struct {
+    uint8_t tab[16];
+    uint8_t tabCnt;
+  }tTable;
+  typedef struct t_HandingFlag      HandingFlag,          *pHandingFlag;
   typedef struct t_RevACkStruct     AckedStruct,         *pAckedStruct;
   typedef struct t_RevDataStruct    RevDataStruct,       *pRevDataStruct;
   typedef struct t_SendDataStruct   SendDataStrct,       *pSendDataStruct;
-  
+  typedef struct t_NeedToAckStruct  NeedToAckStruct,      *pNeedToAckStruct;
   
 
 DS_StatusTypeDef DS_HandingUartDataFromCoreBoard(void);
 DS_StatusTypeDef DS_HandingUartDataFromLeftDoorBoard(void); 
 DS_StatusTypeDef DS_HandingUartDataFromRightDoorBoard(void);
 
-
+DS_StatusTypeDef DS_HandingCoreBoardRequest(void);
+DS_StatusTypeDef DS_HandingLeftDoorBoardRequest(void);
+DS_StatusTypeDef DS_HandingRightDoorBoardRequest(void);
 
 /* USER CODE BEGIN Includes */
 /* USER CODE END Includes */

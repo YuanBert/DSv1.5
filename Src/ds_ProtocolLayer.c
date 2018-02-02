@@ -52,6 +52,9 @@ extern USARTRECIVETYPE     CoreBoardUsartType;
 extern USARTRECIVETYPE     LeftDoorBoardUsartType;
 extern USARTRECIVETYPE     RightDoorBoardUsartType;
 
+HandingFlag     SendOpenFlag;
+
+
 AckedStruct    CoreBoardAckedData;
 AckedStruct    LeftDoorBoardAckedData;
 AckedStruct    RightDoorBoardAckedData;
@@ -65,6 +68,8 @@ SendDataStrct   LeftDoorBoardSendDataStruct;
 SendDataStrct   RightDoorBoardSendDataStruct;
 
 
+NeedToAckStruct sNeedToAckStruct;
+
 
 static uint8_t CoreRevDataBuf[DATABUFLEN];
 static uint8_t CoreSenddataBuf[DATABUFLEN];    
@@ -74,6 +79,41 @@ static uint8_t LeftDoorSendDataBuf[DATABUFLEN];
 
 static uint8_t RightDoorRevDataBuf[DATABUFLEN];
 static uint8_t RightDoorSendDataBuf[DATABUFLEN];
+
+tTable Table = {{0},0};
+
+static uint8_t GetAvailableTableID(void)
+{
+  uint8_t reCode = 0xFF;
+  uint8_t i = 0;
+  
+  for(i = 0; i < 16; i++)
+  {
+    if(0 == Table.tab[i])
+    {
+      return i;
+    }
+  }
+  return reCode;
+}
+
+static uint8_t WriteStatusToTable(uint8_t tableID,uint8_t statusCode)//statusCode : 0-表示空，1-表示正在处理，2-表示处理完成可以回复
+{
+    uint8_t reCode = 0xFF;
+    if(tableID > 16)
+    {
+      return reCode;
+    }
+    if(0 != statusCode && 0 != Table.tab[tableID])
+    {
+      return reCode;
+    }
+    Table.tab[tableID] = statusCode;
+    reCode = tableID;
+    return reCode;
+}
+
+
 
 
 static uint8_t getXORCode(uint8_t* pData,uint16_t len)
@@ -227,6 +267,7 @@ static DS_StatusTypeDef DS_HandingUartData(pRevDataStruct pRevData,pAckedStruct 
         pRevData->TotalLength = pRevData->DataLength + REQUESTFIXEDCOMMANDLEN;
         /* here to XOR check */
         xorTemp = getXORCode(pUsartType->RX_pData + 1, pRevData->TotalLength - 3);
+        /* 校验，如果校验不正确，退出 */
         if(pRevData->XOR8BIT != xorTemp)
         {
           pRevData->TotalLength = 0;
@@ -249,7 +290,6 @@ static DS_StatusTypeDef DS_HandingUartData(pRevDataStruct pRevData,pAckedStruct 
   }
   return state;  
 }
-
 
 /*******************************************************************************
 *
@@ -440,7 +480,7 @@ DS_StatusTypeDef DS_HandingUartDataFromCoreBoard(void)
 DS_StatusTypeDef DS_HandingUartDataFromLeftDoorBoard(void)
 {
   DS_StatusTypeDef state = DS_OK;
-  
+  state = DS_HandingUartData(&LeftDoorBoardRevDataStruct,&LeftDoorBoardAckedData,&LeftDoorBoardUsartType,LeftDoorRevDataBuf);
   return state;
 }
 
@@ -461,9 +501,155 @@ DS_StatusTypeDef DS_HandingUartDataFromLeftDoorBoard(void)
 DS_StatusTypeDef DS_HandingUartDataFromRightDoorBoard(void)
 {
   DS_StatusTypeDef state = DS_OK;
-  
+  state = DS_HandingUartData(&RightDoorBoardRevDataStruct,&RightDoorBoardAckedData,&RightDoorBoardUsartType,RightDoorRevDataBuf);
   return state; 
 }
+
+/*******************************************************************************
+*
+*       Function        :DS_HandingCoreBoardRequest()
+*
+*       Input           :void
+*
+*       Return          :DS_StatusTypeDef
+*
+*       Description     :--
+*
+*
+*       Data            :2018/2/2
+*       Author          :bertz
+*******************************************************************************/
+DS_StatusTypeDef DS_HandingCoreBoardRequest(void)
+{
+  DS_StatusTypeDef state = DS_OK;
+  uint8_t tempTableID;
+  if(CoreBoardRevDataStruct.RevOKFlag)
+  {
+    tempTableID =  GetAvailableTableID();
+    if(0xFF == tempTableID)
+    {
+      return state;
+    }
+    
+    switch((CoreBoardRevDataStruct.CmdType) & 0xF0)
+    {
+    case 0xB0:sNeedToAckStruct.AckCmdCode[tempTableID] = 0xAB;
+              if(0xB2 == CoreBoardRevDataStruct.CmdType && 0x01 == CoreBoardRevDataStruct.CmdParam)
+              {
+                sNeedToAckStruct.AckCodeH[tempTableID] = 0x02;
+                SendOpenFlag.Flag = 1;
+                SendOpenFlag.position = tempTableID;//记录位置
+                Table.tab[tempTableID] = 0x01;//处理中
+              }
+              sNeedToAckStruct.DeviceType[tempTableID] = 0x01;
+              Table.tabCnt++;
+              break;
+              
+    case 0xC0:sNeedToAckStruct.AckCmdCode[tempTableID] = 0xAC;//处理系统设置命令
+              if(0xC1 == CoreBoardRevDataStruct.CmdType)//设置本机
+              {
+                sNeedToAckStruct.AckCodeH[tempTableID] = 0x01;
+                Table.tab[tempTableID] = 0x01;
+                Table.tabCnt++;
+                /* 此处需要处理相关的命令 */
+              }
+              if(0xC2 == CoreBoardRevDataStruct.CmdType)//设置左道闸机
+              {
+                sNeedToAckStruct.AckCodeH[tempTableID] = 0x02;
+                Table.tab[tempTableID] = 0x01;
+                Table.tabCnt++;
+                /* 此处需要处理相关的命令*/
+              }
+              if(0xC3 == CoreBoardRevDataStruct.CmdType)//设置右道闸机
+              {
+                sNeedToAckStruct.AckCodeH[tempTableID] = 0x03;
+                Table.tab[tempTableID] = 0x01;
+                Table.tabCnt++;
+                /* 此处需要处理相关的命令 */
+              }
+              sNeedToAckStruct.DeviceType[tempTableID] = 0x01;break;
+              
+    case 0xD0:sNeedToAckStruct.AckCmdCode[tempTableID] = 0xAD;
+              if(0xD0 == CoreBoardRevDataStruct.CmdType)
+              {
+                sNeedToAckStruct.AckCodeH[tempTableID] = 0x00;
+                if(0x01 == CoreBoardRevDataStruct.CmdParam)
+                {
+                    //
+                  sNeedToAckStruct.AckCodeL[tempTableID] = 0x01;
+                  Table.tab[tempTableID] = 0x02;//完成处理，可以回复
+                  Table.tabCnt++;
+                }
+                if(0x02 == CoreBoardRevDataStruct.CmdParam)
+                {
+                    //
+                  sNeedToAckStruct.AckCodeL[tempTableID] = 0x02;
+                  Table.tab[tempTableID] = 0x02;   
+                  Table.tabCnt++;
+                }
+                if(0x03 == CoreBoardRevDataStruct.CmdParam)
+                {
+                    //
+                  sNeedToAckStruct.AckCodeL[tempTableID] = 0x03;
+                  Table.tab[tempTableID] = 0x02;
+                  Table.tabCnt++;
+                }
+                if(0x04 == CoreBoardRevDataStruct.CmdParam)
+                {
+                    //
+                  sNeedToAckStruct.AckCodeL[tempTableID] = 0x04;
+                  Table.tab[tempTableID] = 0x02;
+                  Table.tabCnt++;
+                }
+              }
+              sNeedToAckStruct.DeviceType[tempTableID] = 0x01;break;
+              
+    case 0xE0:sNeedToAckStruct.AckCmdCode[tempTableID] = 0xAE;
+              sNeedToAckStruct.AckCodeH[tempTableID] = 0xFF;
+              sNeedToAckStruct.AckCodeL[tempTableID] = 0x00;
+              sNeedToAckStruct.DeviceType[tempTableID] = 0x01;
+              Table.tab[tempTableID] = 0x02;
+              Table.tabCnt++;break;
+              
+    case 0xF0:sNeedToAckStruct.AckCmdCode[tempTableID] = 0xAF;
+              sNeedToAckStruct.AckCodeH[tempTableID] = 0xFF;
+              sNeedToAckStruct.AckCodeL[tempTableID] = 0x00;
+              sNeedToAckStruct.DeviceType[tempTableID] = 0x01;
+              Table.tab[tempTableID] = 0x02;
+              Table.tabCnt++;break;
+    
+    default: state = DS_NOCMD;break;
+    }
+    
+    CoreBoardRevDataStruct.DataLength  = 0;
+    CoreBoardRevDataStruct.TotalLength = 0;
+    CoreBoardRevDataStruct.RevOKFlag   = 0;
+  }
+  return state; 
+}
+
+/*******************************************************************************
+*
+*       Function        :DS_HandingLeftDoorBoardRequest()
+*
+*       Input           :void
+*
+*       Return          :DS_StatusTypeDef
+*
+*       Description     :--
+*
+*
+*       Data            :2018/2/2
+*       Author          :bertz
+*******************************************************************************/
+DS_StatusTypeDef DS_HandingLeftDoorBoardRequest(void)
+{
+  DS_StatusTypeDef state = DS_OK;
+  
+  return state;
+}
+
+
 
 /**
 * @}
