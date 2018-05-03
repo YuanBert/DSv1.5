@@ -108,10 +108,11 @@ extern "C" {
     uint8_t tab[16];
     uint8_t tabCnt;
   }tTable;
+
   typedef struct t_HandingFlag      HandingFlag,          *pHandingFlag;
-  typedef struct t_RevACkStruct     AckedStruct,         *pAckedStruct;
-  typedef struct t_RevDataStruct    RevDataStruct,       *pRevDataStruct;
-  typedef struct t_SendDataStruct   SendDataStrct,       *pSendDataStruct;
+  typedef struct t_RevACkStruct     AckedStruct,          *pAckedStruct;
+  typedef struct t_RevDataStruct    RevDataStruct,        *pRevDataStruct;
+  typedef struct t_SendDataStruct   SendDataStrct,        *pSendDataStruct;
   typedef struct t_NeedToAckStruct  NeedToAckStruct,      *pNeedToAckStruct;
   
 
@@ -122,6 +123,8 @@ DS_StatusTypeDef DS_HandingUartDataFromRightDoorBoard(void);
 DS_StatusTypeDef DS_HandingCoreBoardRequest(void);
 DS_StatusTypeDef DS_HandingLeftDoorBoardRequest(void);
 DS_StatusTypeDef DS_HandingRightDoorBoardRequest(void);
+	
+DS_StatusTypeDef DS_SendAckData(void);
 
 /* USER CODE BEGIN Includes */
 /* USER CODE END Includes */

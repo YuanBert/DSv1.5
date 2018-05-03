@@ -1,7 +1,7 @@
 /**
   ******************************************************************************
-  * File Name          : main.c
-  * Description        : Main program body
+  * @file           : main.c
+  * @brief          : Main program body
   ******************************************************************************
   ** This notice applies to any and all portions of this file
   * that are not between comment pairs USER CODE BEGIN and
@@ -35,7 +35,6 @@
   *
   ******************************************************************************
   */
-
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "stm32f1xx_hal.h"
@@ -47,6 +46,11 @@
 #include "gpio.h"
 
 /* USER CODE BEGIN Includes */
+#include "ds_DataTransmissionLayer.h"
+#include "ds_ProtocolLayer.h"
+#include "Common.h"
+#include "ds_gentlesensor.h"
+#include "ds_log.h"
 #include "ds_FillLight.h"
 /* USER CODE END Includes */
 
@@ -54,6 +58,28 @@
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
+/*添加版本号，方便处理程序和后期的维修*/
+#define		CODEVERSION				0x0201			//版本号
+#define     TEMPUTERALARMVALUE		0x04FF			//温度报警阈值
+#define     LIGHTHELPVALUE			0x04FF			//常亮补光灯阈值
+uint16_t gLogReportCnt;
+uint8_t  gLogReportFlag;
+uint8_t  gLEDsCarFlag;
+uint8_t  gCarComingFlag;
+
+uint8_t		gPWMLedFlag;
+uint8_t     gTIM5PWMFlag;
+uint8_t     gTIM5PWMCnt;
+uint16_t    gPWMValue;
+
+uint32_t  gADCBuffer[10];
+uint32_t  gTempterValue;
+uint32_t  gLightValue;
+uint32_t  gADCTimCnt;
+uint8_t   gADCTimCntFlag;
+/*氛围灯设置*/
+uint16_t  gLEDCnt;
+uint8_t  gLEDFlag;
 
 /* USER CODE END PV */
 
@@ -63,17 +89,22 @@ static void MX_NVIC_Init(void);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
+static void CheckLightAndTemperture(void);
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
-
+extern USARTRECIVETYPE     CoreBoardUsartType;
+GPIOSTATUSDETECTION gGentleSensorStatusDetection;
 /* USER CODE END 0 */
 
+/**
+  * @brief  The application entry point.
+  *
+  * @retval None
+  */
 int main(void)
 {
-
   /* USER CODE BEGIN 1 */
-
   /* USER CODE END 1 */
 
   /* MCU Configuration----------------------------------------------------------*/
@@ -97,21 +128,27 @@ int main(void)
   MX_DMA_Init();
   MX_ADC1_Init();
   MX_SPI1_Init();
-  MX_TIM4_Init();
-  MX_TIM5_Init();
+  MX_TIM4_Init();//0.1ms
+  MX_TIM5_Init();//1ms
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   MX_USART3_UART_Init();
-  MX_TIM3_Init();
+  MX_TIM3_Init();//4ms
 
   /* Initialize interrupts */
   MX_NVIC_Init();
-
   /* USER CODE BEGIN 2 */
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
-  HAL_TIM_Base_Start_IT(&htim4);
-  HAL_TIM_Base_Start_IT(&htim5);
-
+	HAL_TIM_Base_Start_IT(&htim4);
+	HAL_TIM_Base_Start_IT(&htim5);
+	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+	HAL_ADC_Start_DMA(&hadc1, (uint32_t*)&gADCBuffer, 10);
+	
+	DS_LED_Init();
+	DS_GentleSensorInit();
+	DS_CoreBoardProtocolInit();
+	DS_LeftDoorBoardProtocolInit();
+	DS_RightDoorBoardProtocolInit();
+	
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -121,14 +158,70 @@ int main(void)
   /* USER CODE END WHILE */
 
   /* USER CODE BEGIN 3 */
-
+	  
+	  /*处理来自核心板的数据*/
+	DS_HandingUartDataFromCoreBoard();
+	DS_HandingCoreBoardRequest();
+	
+	/*处理来自闸机A的数据*/
+	DS_HandingUartDataFromLeftDoorBoard();
+	DS_HandingLeftDoorBoardRequest();
+	  
+	  /*处理来自道闸B的数据*/
+	DS_HandingUartDataFromRightDoorBoard();
+	DS_HandingRightDoorBoardRequest(); 
+	  
+	DS_SendAckData();
+	  
+	  /* 检测地感信号 */
+	  DS_GentleSensorCheck();
+	  
+	/*检测温度和光照*/
+	  if (gADCTimCntFlag)
+	  {
+		  gADCTimCntFlag = 0;
+		  CheckLightAndTemperture();
+	  }
+	  
+	/*PWM补光灯控制*/
+	  if (gCarComingFlag)
+	{
+		if (gPWMValue > 3800)
+		{
+		  gPWMValue = 3900;
+		}
+		
+		DS_SetLedPwmValue(gPWMValue);
+	}
+	else
+	{
+		DS_SetLedPwmValue(0);
+	}
+	  
+	  
+	 /*上报时间到的时候，进行日志上报*/
+	if (gLogReportFlag)
+	{
+		DS_ReportLogInfo(); 
+		gLogReportFlag = 0;
+	 }
+	  
+	 /* 氛围灯控制 */
+	if (gLEDFlag)
+	{
+	  gLEDFlag = 0;
+	  DS_LEDS_TEST();
+	}
+	  
   }
   /* USER CODE END 3 */
 
 }
 
-/** System Clock Configuration
-*/
+/**
+  * @brief System Clock Configuration
+  * @retval None
+  */
 void SystemClock_Config(void)
 {
 
@@ -183,8 +276,10 @@ void SystemClock_Config(void)
   HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
 }
 
-/** NVIC Configuration
-*/
+/**
+  * @brief NVIC Configuration.
+  * @retval None
+  */
 static void MX_NVIC_Init(void)
 {
   /* USART1_IRQn interrupt configuration */
@@ -222,67 +317,181 @@ static void MX_NVIC_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-  /* Prevent unused argument(s) compilation warning */
-  UNUSED(htim);
-  /* NOTE : This function Should not be modified, when the callback is needed,
-            the __HAL_TIM_PeriodElapsedCallback could be implemented in the user file
-   */
-  /* 0.1 ms*/
-if(htim4.Instance == htim->Instance)
-{
-  
+	/* Prevent unused argument(s) compilation warning */
+	UNUSED(htim);
+	/* NOTE : This function Should not be modified, when the callback is needed,
+	          the __HAL_TIM_PeriodElapsedCallback could be implemented in the user file
+	       */
+	/* 4ms */
+	if (htim3.Instance == htim->Instance)
+	{
+		
+	}
+	
+	/* 0.1ms */
+	if (htim4.Instance == htim->Instance)
+	{
+		/* 添加地感处理 */
+		gGentleSensorStatusDetection.GpioCurrentReadVal = HAL_GPIO_ReadPin(GentleSensor_GPIO_Port, GentleSensor_Pin);
+		if (0 == gGentleSensorStatusDetection.GpioCurrentReadVal && 0 == gGentleSensorStatusDetection.GpioLastReadVal)
+		{
+			if (0 == gGentleSensorStatusDetection.GpioCheckedFlag)
+			{
+				gGentleSensorStatusDetection.GpioFilterCnt++;
+				if (gGentleSensorStatusDetection.GpioFilterCnt > gGentleSensorStatusDetection.GpioFilterCntSum)
+				{
+					gGentleSensorStatusDetection.GpioStatusVal		= 1;
+					gGentleSensorStatusDetection.GpioFilterCnt		= 0;
+					gGentleSensorStatusDetection.GpioCheckedFlag	= 1;
+					gCarComingFlag = 1;
+					DS_UpgentleStatusInfoLog(1);
+					gPWMLedFlag = 1;
+				}
+			}
+		}
+		else
+		{
+			gGentleSensorStatusDetection.GpioCheckedFlag	= 0;
+			gGentleSensorStatusDetection.GpioFilterCnt		= 0;
+			gGentleSensorStatusDetection.GpioStatusVal		= 0;
+			gGentleSensorStatusDetection.GpioSendDataFlag	= 1;
+			gCarComingFlag = 0;
+			DS_UpgentleStatusInfoLog(0);
+			gPWMLedFlag = 0;
+		}
+		gGentleSensorStatusDetection.GpioLastReadVal = gGentleSensorStatusDetection.GpioCurrentReadVal;
+		
+		
+	}
+	
+	/* 1ms */
+	if (htim5.Instance == htim->Instance)
+	{
+		gADCTimCnt++;
+		if (gADCTimCnt > 60000)
+		{
+			gADCTimCntFlag = 1;
+			gADCTimCnt = 0;
+		}
+		if (gGentleSensorStatusDetection.GpioValidLogicTimeCnt > 80)
+		{
+			gGentleSensorStatusDetection.GpioValidLogicTimeCnt--;
+		}
+		
+		/*上报日志 6s 一次*/
+		gLogReportCnt++;
+		if (gLogReportCnt > 5000)
+		{
+			gLogReportFlag = 1;
+			gLogReportCnt = 0;
+		}
+		
+		/*来车时每秒钟闪烁五次，无车时保持常亮*/
+		gLEDCnt++;
+		if (gLEDCnt > 200)
+		{
+			gLEDFlag = 1;
+			gLEDCnt = 0;
+		}
+		
+		/*PWM控制 */
+		gTIM5PWMCnt++;
+		if (gTIM5PWMCnt > 3)
+		{
+			if (gCarComingFlag)
+			{
+				gPWMValue += 2;
+				gTIM5PWMFlag = 1;
+			}
+			else
+			{
+				gPWMValue = 1800;
+				gTIM5PWMFlag = 0;
+          
+			}
+			gTIM5PWMCnt = 0;
+		}
+	}	
 }
 
-/* 1ms */
-if(htim5.Instance == htim->Instance)
+void CheckLightAndTemperture(void)
 {
-  
-}
-
+	uint8_t i;
+	for (i = 0; i < 10;)
+	{
+		gLightValue += gADCBuffer[i++]; 
+		gTempterValue += gADCBuffer[i++];
+	}
+	gLightValue /= 5;
+	gTempterValue /= 5;
+	DS_UpLightInfoLog(gLightValue);
+	DS_UpTemInfoLog(gTempterValue);
+		  
+	if (gLightValue < LIGHTHELPVALUE)
+	{
+		DS_UpFlashLightInfoLog(1);
+		/*此处添加打开灯的控制*/
+	}
+	else
+	{
+		DS_UpFlashLightInfoLog(0);
+	}
+		  
+	if (gTempterValue > TEMPUTERALARMVALUE)
+	{
+		/* 温度过高开启散热 */
+		DS_FAN_OUT_ON();
+		DS_UpFanStatusInfoLog(1);
+	}
+	else
+	{
+		/*温度正常，关闭散热*/
+		DS_FAN_OUT_OFF();
+		DS_UpFanStatusInfoLog(0);
+	} 
+	return ;
 }
 /* USER CODE END 4 */
 
 /**
   * @brief  This function is executed in case of error occurrence.
-  * @param  None
+  * @param  file: The file name as string.
+  * @param  line: The line in file as a number.
   * @retval None
   */
-void _Error_Handler(char * file, int line)
+void _Error_Handler(char *file, int line)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
   while(1) 
   {
   }
-  /* USER CODE END Error_Handler_Debug */ 
+  /* USER CODE END Error_Handler_Debug */
 }
 
-#ifdef USE_FULL_ASSERT
-
+#ifdef  USE_FULL_ASSERT
 /**
-   * @brief Reports the name of the source file and the source line number
-   * where the assert_param error has occurred.
-   * @param file: pointer to the source file name
-   * @param line: assert_param error line source number
-   * @retval None
-   */
+  * @brief  Reports the name of the source file and the source line number
+  *         where the assert_param error has occurred.
+  * @param  file: pointer to the source file name
+  * @param  line: assert_param error line source number
+  * @retval None
+  */
 void assert_failed(uint8_t* file, uint32_t line)
-{
+{ 
   /* USER CODE BEGIN 6 */
   /* User can add his own implementation to report the file name and line number,
     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
   /* USER CODE END 6 */
-
 }
-
-#endif
-
-/**
-  * @}
-  */ 
+#endif /* USE_FULL_ASSERT */
 
 /**
   * @}
-*/ 
+  */
+
+/**
+  * @}
+  */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
